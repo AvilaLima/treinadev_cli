@@ -1,2 +1,2 @@
-require '/lib/cli.rb'
+require './lib/cli.rb'
 CLI.run

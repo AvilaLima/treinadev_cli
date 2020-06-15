@@ -1,3 +1,5 @@
+require 'colorize'
+require './db/connect'
 class CLI
 
   def self.run
@@ -14,12 +16,12 @@ class CLI
       case input
       when "help"
         CLI.help
-      when "listar top 10"
+      when "top 10"
         CLI.list_top
-      when "busca por município(nome)"
-        CLI.list_viewers
-      when "busca por código"
-        CLI.list_countries
+      when "todos"
+        CLI.list_counties
+      when "busca"
+        CLI.codigo
       when "self help"
         puts "Thank you for taking the time to reflect, and recognizing the importance of self care. <3"
         puts "\n"
@@ -39,208 +41,87 @@ class CLI
   def self.help
     puts "Help".bold
     puts "  help\t\t\t:para mostrar esse menu de ajuda".green
-    puts "List".bold
-    puts "  list top 10\t\t:list os 10 municípios mais populosos".green
-    puts "  list viewers\t\t:list names of all viewers".green
-    puts "  list countries\t:list names of all countries between shows/viewers".green
+    puts "Listas".bold
+    puts "  top.10\t\t:lista os 10 municípios mais populosos".green
+    puts "  todos\t\t\t:lista todos os municípios".green
     puts "Data".bold
-    puts "  codigo\t\t\t:buscar por codigo".green
-    puts "  nome\t\t:buscar por nome".green
-    puts "Quit".bold
-    puts "  quit\t\t\t:sair do programa".green
+    puts "  busca\t\t\t:buscar por codigo ou nome".green
+    puts "Sair".bold
+    puts "  sair\t\t\t:sair do programa".green
     puts "  exit\t\t\t:também sai do programa".green
   end
 
   def self.list_top
-    Show.all.each_with_index { |show,i| puts (i+1).to_s.bold + ".\t#{show.title}" }
-  end
-
-  def self.list_viewers
-    Viewer.all.each_with_index { |viewer,i| puts (i+1).to_s.bold + ".\t#{viewer.name}" }
+    DB['SELECT code, name, population 
+        FROM counties
+        ORDER BY population DESC
+        LIMIT 10'].each do |county|
+      puts "Município:"+ "#{county[:name]}".green + 
+           " - Populaçao:"+ "#{county[:population]}".green
+    end
   end
 
   def self.submenu_help(menu)
     puts "Help".bold
-    puts "  help\t\t\t:show this help menu".green
-    puts "List".bold
-    puts "  list\t\t\t:list all #{menu}s".green
-    puts "Navigation".bold
-    puts "  exit\t\t\t:exit to main menu".green
-    puts "  main\t\t\t:alias for exit".green
+    puts "  help\t\t\t:mostrar esse menu ajuda(help)".green
+    puts "Listar".bold
+    puts "  list\t\t\t:lista tudo #{menu}s".green
+    puts "Navegação".bold
+    puts "  exit\t\t\t:sair para o menu principal".green
+    puts "  menu\t\t\t:mesma coisa que exit".green
   end
 
-  def self.list_countries
-    Show.countries.each { |country| puts country }
-  end
-
-  def self.show_data(show)
-    puts "  title:\t\t#{show.title}"
-    puts "  network:\t\t#{show.network}"
-    puts "  country:\t\t#{show.country}"
-    puts "  total viewers:\t#{show.num_ratings}"
-    puts "  average rating:\t#{show.average_rating}"
-  end
-
-  def self.list_summary?(show)
-    loop do
-      print "List summary for this show? (y/n): ".magenta
-      yn = gets.chomp
-
-      case yn
-      when 'y'
-        puts show.summary
-        break
-      when 'n'
-        break
-      end
+  def self.list_counties #list_countries
+    DB['SELECT code, name, population 
+      FROM counties
+      ORDER BY population DESC'].each do |county|
+    puts "Código: "+ "#{county[:code]}".green + +
+         " - Município: "+ "#{county[:name]}".green + 
+         " - Populaçao: "+ "#{county[:population]}".green
     end
   end
 
-  def self.list_viewers_of_show?(show)
-    loop do
-      print "List viewers for this show? (y/n): ".magenta
-      yn = gets.chomp
-
-      case yn
-      when 'y'
-        loop do
-          print "List all viewers, in same country, or living elsewhere? (all/same/other): ".magenta
-
-          which_viewers = gets.chomp
-
-          case which_viewers
-          when "same"
-            # show.viewers.select { |v| v.country == show.country }.each { |v| puts v.name }
-            show.viewers.where("country = ?", show.country).each { |v| puts v.name }
-            break
-          when "other"
-            # show.viewers.reject { |v| v.country == show.country }.each { |v| puts v.name + ",  " + v.country.yellow }
-            show.viewers.where("country != ?", show.country).each { |v| puts v.name + ",  " + v.country.yellow }
-            break
-          when "all"
-            show.viewers.each { |v| puts v.name + ",  " + v.country.yellow }
-            break
-          end
-        end
-        puts "\n"
-      when 'n'
-        break
-      end
+  def self.county_data(counties)
+    counties.each do |county|
+      puts "Código: "+ "#{county[:code]}".green + 
+           " - Município: "+ "#{county[:name]}".green + 
+           " - Populaçao: "+ "#{county[:population]}".green
     end
   end
 
-  def self.viewer_data(viewer)
-    puts "  name:\t\t#{viewer.name}"
-    puts "  country:\t#{viewer.country}"
-    puts "  top shows:"
-    if viewer.top_three.empty?
-      puts "\tno shows rated".upcase.magenta
-    else
-      puts "\trating\tshow".upcase.magenta
-      viewer.top_three.each { |r| puts "\t#{r.rating}\t#{r.show.title}" }
-    end
-  end
-
-  def self.list_watched_shows?(viewer)
+  def self.codigo
     loop do
-      print "List all watched shows? (y/n): ".magenta
-      yn = gets.chomp
-
-      case yn
-      when 'y'
-        viewer.shows.each { |s| puts s.title }
-        break
-      when 'n'
-        break
-      end
-    end
-  end
-
-  def self.list_favorite_shows?(viewer)
-    loop do
-      print "List data for favorite shows? (y/n): ".magenta
-      yn = gets.chomp
-
-      case yn
-      when 'y'
-        loop do
-          print "Which show? (1,2,3): ".magenta
-          show_num = gets.chomp.to_i
-
-          if show_num <=3 && show_num > 0
-            show = viewer.top_three[show_num-1].show
-            CLI.show_data(show)
-            CLI.list_summary?(show)
-            puts "\n"
-            break
-          end
-        end
-      when 'n'
-        break
-      end
-    end
-  end
-
-  def self.show
-    loop do
-      puts "\nType 'list' to list all shows, or 'exit' to return to main menu".magenta
-      print "Enter show ID: ".cyan
+      puts "\nDigite 'listar' para listar todos os municípios,
+            ou 'sair' para retornar ao menu principal".magenta
+      print "Digite um código ou nome do município: ".cyan
 
       input = gets.chomp
 
-      break if input == "exit" || input == "main"
+      break if input == "exit" || input == "menu"
 
-      if input == "list"
-        CLI.list_shows
-      elsif input == "help"
-        CLI.submenu_help("show")
-      else
-        begin
-          id = input.to_i
-
-          ## FIXME: This will also handle cases where input is not an integer
-          ## WHY?
-          raise CLIError if id > Show.count || id < 1
-          show = Show.all[id-1]
-          CLI.show_data(show)
-          puts "\n"
-          CLI.list_summary?(show)
-          CLI.list_viewers_of_show?(show)
-        ## Do some error handling
-        rescue CLIError => error
-          puts error.message
-        end
-      end
-    end
-  end
-
-  def self.viewer
-    loop do
-      puts "\nType 'list' to list all viewers, or 'exit' to return to main menu".magenta
-      print "Enter viewer ID: ".cyan
-
-      input = gets.chomp
-
-      break if input == "exit" || input == "main"
-
-      if input == "list"
-        CLI.list_viewers
+      if input == "todos"
+        CLI.list_counties
       elsif input == "help"
         CLI.submenu_help("viewer")
       else
         begin
-          id = input.to_i
-          ## FIXME: This is hacky but works
-          raise CLIError if id > Viewer.count || id < 1
-          viewer = Viewer.all[id-1]
-          CLI.viewer_data(viewer)
-          puts "\n"
-          CLI.list_watched_shows?(viewer)
-          CLI.list_favorite_shows?(viewer)
-        ## Error handling
-        rescue CLIError => error
-          puts error.message
-        end
+          if input =~ /\d/ 
+            id = input.to_i
+            counties = DB['SELECT * FROM counties WHERE code = ?', id]
+            raise CLIError if counties.empty?
+            CLI.county_data(counties)
+            puts "\n"
+          else
+            name = input
+            counties = DB[:counties].where(Sequel.like(:name, "%#{name}%"))
+            raise CLIError if counties.empty?
+            CLI.county_data(counties)
+            puts "\n"
+          end
+          ## Error handling
+          rescue CLIError => error
+            puts error.message
+          end
       end
     end
   end
